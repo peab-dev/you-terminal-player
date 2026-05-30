@@ -193,6 +193,29 @@ def frame_to_ascii(buf: bytes, width: int, height: int, color: bool = True) -> s
     return "\n".join(out)
 
 
+def frame_to_fullblocks(buf: bytes, width: int, height: int) -> str:
+    """Render a raw rgb24 frame as solid colored full blocks ('█').
+
+    Like the classic half-block mode but each cell is one solid color (the two
+    stacked pixels averaged, keeping the aspect ratio) — chunkier, lower-res.
+    """
+    row_stride = width * 3
+    out: list[str] = []
+    for ty in range(height):
+        top = ty * 2 * row_stride
+        bot = (ty * 2 + 1) * row_stride
+        cells: list[str] = []
+        for tx in range(width):
+            ti = top + tx * 3
+            bi = bot + tx * 3
+            r = (buf[ti] + buf[bi]) >> 1
+            g = (buf[ti + 1] + buf[bi + 1]) >> 1
+            b = (buf[ti + 2] + buf[bi + 2]) >> 1
+            cells.append(f"\x1b[38;2;{r};{g};{b}m█")
+        out.append("".join(cells))
+    return "\n".join(out)
+
+
 # The classic 16 ANSI colors (approx. xterm RGB) with their SGR foreground codes.
 _PALETTE_16 = [
     ((0, 0, 0), 30), ((205, 0, 0), 31), ((0, 205, 0), 32), ((205, 205, 0), 33),

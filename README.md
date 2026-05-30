@@ -43,7 +43,7 @@ yt --no-audio "<url>"                       # silent
 yt --cookies-from-browser safari "<url>"    # if YouTube says "confirm you're not a bot"
 ```
 
-**Controls:** `space` = pause/resume · `v` = display mode (classic → ASCII → b&w → 16-color digits) · `q` / `ESC` = quit
+**Controls:** `space` = pause/resume · `v` = display mode (classic → ASCII → b&w → 16-color digits → full-blocks) · `q` / `ESC` = quit
 **Resize the window anytime** — the picture refits to fill it (aspect preserved, no stretching).
 **Tip:** enlarge the window + shrink the font (`Cmd` `-`) for a sharper picture.
 
