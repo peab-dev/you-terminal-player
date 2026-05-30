@@ -292,6 +292,74 @@ def frame_to_digits(buf: bytes, width: int, height: int) -> str:
     return "\n".join(out)
 
 
+# "hippieparty": ASCII symbols, colors quantized to red / blue / white / gray.
+_HIPPIE_PALETTE = [(220, 30, 30), (40, 70, 210), (235, 235, 235), (130, 130, 130)]
+
+
+def frame_to_hippie(buf: bytes, width: int, height: int) -> str:
+    """Render a raw rgb24 frame with ASCII symbols in only 4 colors:
+    red, blue, white and gray (nearest match per cell)."""
+    ramp = _ASCII_RAMP
+    last = len(ramp) - 1
+    pal = _HIPPIE_PALETTE
+    row_stride = width * 3
+    out: list[str] = []
+    for ty in range(height):
+        top = ty * 2 * row_stride
+        bot = (ty * 2 + 1) * row_stride
+        cells: list[str] = []
+        for tx in range(width):
+            ti = top + tx * 3
+            bi = bot + tx * 3
+            r = (buf[ti] + buf[bi]) >> 1
+            g = (buf[ti + 1] + buf[bi + 1]) >> 1
+            b = (buf[ti + 2] + buf[bi + 2]) >> 1
+            lum = (r * 299 + g * 587 + b * 114) // 1000
+            ch = ramp[lum * last // 255]
+            pr, pg, pb = min(pal, key=lambda c: (r - c[0]) ** 2 + (g - c[1]) ** 2 + (b - c[2]) ** 2)
+            cells.append(f"\x1b[38;2;{pr};{pg};{pb}m{ch}")
+        out.append("".join(cells))
+    return "\n".join(out)
+
+
+# "emojis": colored square emojis chosen by nearest color. Each is double-width,
+# so one emoji covers a 2x2 source block (and two terminal columns).
+_EMOJI_PALETTE = [
+    ((0, 0, 0), "⬛"), ((255, 255, 255), "⬜"), ((255, 0, 0), "🟥"),
+    ((255, 140, 0), "🟧"), ((255, 255, 0), "🟨"), ((0, 190, 0), "🟩"),
+    ((0, 90, 255), "🟦"), ((150, 40, 220), "🟪"), ((140, 80, 40), "🟫"),
+]
+
+
+def frame_to_emoji(buf: bytes, width: int, height: int) -> str:
+    """Render a raw rgb24 frame as a mosaic of colored square emojis."""
+    pal = _EMOJI_PALETTE
+    row_stride = width * 3
+    out: list[str] = []
+    for ty in range(height):
+        top = ty * 2 * row_stride
+        bot = (ty * 2 + 1) * row_stride
+        cells: list[str] = []
+        for tx in range(0, width - 1, 2):  # 2 cols per emoji (double-width)
+            # average the 2x2 source block
+            r = g = b = 0
+            for cx in (tx, tx + 1):
+                for base in (top, bot):
+                    p = base + cx * 3
+                    r += buf[p]
+                    g += buf[p + 1]
+                    b += buf[p + 2]
+            r >>= 2
+            g >>= 2
+            b >>= 2
+            nearest = min(
+                pal, key=lambda c: (r - c[0][0]) ** 2 + (g - c[0][1]) ** 2 + (b - c[0][2]) ** 2
+            )
+            cells.append(nearest[1])
+        out.append("".join(cells))
+    return "\n".join(out)
+
+
 class VideoSource:
     """Streams a video as raw rgb24 half-block frames using an ffmpeg pipe.
 

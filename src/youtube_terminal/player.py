@@ -19,7 +19,9 @@ from .render import (
     frame_to_ansi,
     frame_to_ascii,
     frame_to_digits,
+    frame_to_emoji,
     frame_to_fullblocks,
+    frame_to_hippie,
     frame_to_matrix,
 )
 from .resolve import Resolved, ResolveError, resolve
@@ -28,7 +30,7 @@ from .resolve import Resolved, ResolveError, resolve
 RES_OPTIONS = [240, 360, 480, 720, 1080]
 
 # Display modes, cycled with the "v" key.
-MODES = ("classic", "ascii", "bw", "digit16", "fullblock", "matrix")
+MODES = ("classic", "ascii", "bw", "digit16", "fullblock", "matrix", "hippieparty", "emojis")
 _MODE_LABELS = {
     "classic": "classic",
     "ascii": "ascii",
@@ -36,6 +38,8 @@ _MODE_LABELS = {
     "digit16": "16-color digits",
     "fullblock": "full-blocks",
     "matrix": "matrix",
+    "hippieparty": "hippieparty",
+    "emojis": "emojis",
 }
 
 
@@ -51,6 +55,10 @@ def _render_body(buf: bytes, w: int, h: int, mode: str) -> str:
         return frame_to_fullblocks(buf, w, h)
     if mode == "matrix":
         return frame_to_matrix(buf, w, h)
+    if mode == "hippieparty":
+        return frame_to_hippie(buf, w, h)
+    if mode == "emojis":
+        return frame_to_emoji(buf, w, h)
     return frame_to_ansi(buf, w, h)  # classic colored half-blocks
 
 
