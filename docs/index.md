@@ -1,4 +1,6 @@
-# you-terminal-player
+<p align="center">
+  <img src="assets/banner.svg" alt="you-terminal-player" width="100%">
+</p>
 
 Watch **YouTube videos right inside your terminal** — rendered as colored
 half-blocks at the terminal's full resolution and the video's original frame

@@ -1,18 +1,21 @@
-# you-terminal-player
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="you-terminal-player" width="100%">
+</p>
 
-**Watch YouTube in your terminal** — video as colored half-blocks at full
-resolution and original frame rate, **with live, synchronized sound**. 📺🔊
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-ff0033?style=flat-square"></a>
+  <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10+-39ff14?style=flat-square&logo=python&logoColor=white">
+  <img alt="Platform: macOS" src="https://img.shields.io/badge/platform-macOS-00e5ff?style=flat-square&logo=apple&logoColor=white">
+  <img alt="Powered by yt-dlp" src="https://img.shields.io/badge/powered%20by-yt--dlp-ff0033?style=flat-square">
+  <a href="https://peab-dev.github.io/you-terminal-player/"><img alt="Docs" src="https://img.shields.io/badge/docs-GitHub%20Pages-39ff14?style=flat-square"></a>
+</p>
 
-> 📖 **Full documentation:** https://peab-dev.github.io/you-terminal-player/
+<p align="center">
+  <strong>Watch YouTube in your terminal</strong> — video as colored half-blocks at full
+  resolution and original frame rate, <strong>with live, synchronized sound</strong>. 📺🔊
+</p>
 
-```
-┌──────────────────────────────────────────┐
-│  yt "https://youtu.be/..."                │
-│                                            │
-│   ▀▀▀▀▀  half-block video + live audio,    │
-│   ▀▀▀▀▀  streamed straight from YouTube    │
-└──────────────────────────────────────────┘
-```
+<p align="center">📖 <a href="https://peab-dev.github.io/you-terminal-player/"><strong>Full documentation</strong></a></p>
 
 ## Quick start
 

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 260" width="900" height="260" role="img" aria-label="you-terminal-player">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#141414"/>
+      <stop offset="1" stop-color="#0a0a0a"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff0033"/>
+      <stop offset="0.5" stop-color="#39ff14"/>
+      <stop offset="1" stop-color="#00e5ff"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- window -->
+  <rect x="4" y="4" width="892" height="252" rx="16" fill="url(#bg)" stroke="#262626" stroke-width="2"/>
+  <!-- title bar dots -->
+  <circle cx="34" cy="34" r="7" fill="#ff5f56"/>
+  <circle cx="58" cy="34" r="7" fill="#ffbd2e"/>
+  <circle cx="82" cy="34" r="7" fill="#27c93f"/>
+  <text x="112" y="39" font-family="ui-monospace,Menlo,monospace" font-size="14" fill="#666">~/you-terminal-player — yt</text>
+
+  <!-- red play button -->
+  <rect x="52" y="92" width="96" height="70" rx="16" fill="#ff0033"/>
+  <path d="M88 112 L122 127 L88 142 Z" fill="#ffffff"/>
+
+  <!-- title + tagline -->
+  <text x="172" y="124" font-family="ui-monospace,Menlo,monospace" font-weight="700" font-size="40" fill="#f1f1f1" filter="url(#glow)">you-terminal-player</text>
+  <text x="174" y="158" font-family="ui-monospace,Menlo,monospace" font-size="18" fill="#39ff14">watch YouTube in your terminal · with live sound</text>
+
+  <!-- half-block "video" strip -->
+  <text x="174" y="206" font-family="ui-monospace,Menlo,monospace" font-size="22" letter-spacing="1">
+    <tspan fill="#ff0033">▀▀▀</tspan><tspan fill="#ff7a00">▀▀</tspan><tspan fill="#ffd400">▀▀</tspan><tspan fill="#39ff14">▀▀▀</tspan><tspan fill="#00e5ff">▀▀</tspan><tspan fill="#4d9fff">▀▀</tspan><tspan fill="#b14dff">▀▀▀</tspan><tspan fill="#f1f1f1">▀▀</tspan>
+  </text>
+  <text x="470" y="206" font-family="ui-monospace,Menlo,monospace" font-size="18" fill="#888">$ yt ▏<tspan fill="#39ff14">█</tspan></text>
+
+  <!-- accent underline -->
+  <rect x="172" y="222" width="540" height="3" rx="1.5" fill="url(#bar)"/>
+</svg>
