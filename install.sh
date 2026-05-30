@@ -56,9 +56,6 @@ NODE_DIR="$(dirname "$(command -v node)")"
 info "Node directory: $NODE_DIR"
 
 # --- 4. Python venv + packages --------------------------------------------
-SIBLING="$(cd "$PROJECT_DIR/.." && pwd)/first-grok-build"
-[ -d "$SIBLING" ] || die "Required sibling project not found: $SIBLING"
-
 if [ ! -x "$VENV/bin/python" ]; then
     info "Creating virtualenv…"
     python3 -m venv "$VENV"

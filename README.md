@@ -27,9 +27,8 @@ yt           # play the default video
 venv, the `yt-dlp` + PO-token pieces, the bgutil Docker server, and a global `yt`
 command on your `PATH`. Re-run it anytime.
 
-> **Requires Docker Desktop** (for the PO-token server) and the local sibling
-> project `first-grok-build` placed next to this folder (it provides the
-> renderer / audio engine).
+> **Requires Docker Desktop** (for the PO-token server). Everything else is
+> self-contained.
 
 ## Usage
 

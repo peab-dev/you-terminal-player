@@ -4,8 +4,8 @@ Watch **YouTube videos right inside your terminal** — rendered as colored
 half-blocks at the terminal's full resolution and the video's original frame
 rate, **with live, synchronized sound**.
 
-It's the logical next step after the `first-grok-build` terminal media gallery
-(a local sibling project), whose renderer and audio engine it reuses.
+It's fully self-contained: a small half-block renderer plus `yt-dlp`, `ffmpeg`
+and `ffplay` do all the work.
 
 ---
 
@@ -41,14 +41,9 @@ yt <youtube-url>
 | `ffmpeg` / `ffplay` | decode video frames + play audio | `brew install ffmpeg` |
 | Node.js ≥ 22 | solve YouTube's JS "n" challenge (via yt-dlp EJS) | `brew install node` |
 | Docker Desktop | runs the bgutil PO-token server | https://docker.com |
-| `first-grok-build` | renderer / audio engine (local sibling project) | place next to this repo |
 
 The `install.sh` script sets up everything above that it can (it can't GUI-install
 Docker Desktop, only start it).
-
-> **Note:** this project depends on the sibling project `first-grok-build` via a
-> local path. Clone it next to `you-terminal-player` so the folders sit
-> side by side before installing.
 
 ---
 
@@ -139,18 +134,17 @@ Enlarge the terminal window and reduce the font size *before* running `yt`.
 
 ## Internals
 
-`yt` is a thin layer over reusable building blocks from `first-grok-build`'s
-`art.dissolve` module:
+Three small modules, no external project dependency:
 
-- `fit_grid()` — fit the source into the terminal cell grid, preserving aspect.
-- `frame_to_ansi()` — turn a raw rgb24 frame into a half-block ANSI string.
-- `VideoSource` — an ffmpeg pipe that yields ready-to-render frames
-  (subclassed here as `StreamVideoSource` to add network auto-reconnect).
-- `AudioPlayer` — an ffplay subprocess with seek support for pause/resume.
-- `KeyReader` — non-blocking keyboard input.
-
-This project adds only `resolve.py` (YouTube → stream URLs via yt-dlp) and
-`player.py` (the single-video streaming loop).
+- `render.py` — the self-contained building blocks:
+  - `fit_grid()` — fit the source into the terminal cell grid, preserving aspect.
+  - `frame_to_ansi()` — turn a raw rgb24 frame into a half-block ANSI string.
+  - `VideoSource` — an ffmpeg pipe that yields ready-to-render frames.
+  - `AudioPlayer` — an ffplay subprocess with seek support for pause/resume.
+  - `KeyReader` — non-blocking keyboard input.
+- `resolve.py` — YouTube URL → direct stream URLs via yt-dlp.
+- `player.py` — the single-video streaming loop (`StreamVideoSource` adds
+  network auto-reconnect to `VideoSource`).
 
 ---
 

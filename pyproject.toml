@@ -14,7 +14,6 @@ authors = [
 ]
 dependencies = [
     "yt-dlp>=2024.1.0",
-    "first-grok-build[art] @ file:///Users/peter/Developer/first-grok-build",
 ]
 
 [project.scripts]
@@ -25,9 +24,6 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.4",
 ]
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/youtube_terminal"]

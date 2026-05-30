@@ -1,8 +1,8 @@
 """Play a streamed video (rgb24 frames + audio) in the terminal.
 
-Reuses the proven half-block renderer, ffmpeg frame pipe and ffplay audio from
-first_grok_build.art.dissolve; this module only adds network-stream handling
-and a single-video playback loop.
+Builds on the self-contained half-block renderer, ffmpeg frame pipe and ffplay
+audio in `render.py`; this module adds network-stream handling and a
+single-video playback loop.
 """
 
 from __future__ import annotations
@@ -12,14 +12,13 @@ import subprocess
 import sys
 import time
 
-from first_grok_build.art.dissolve import (
+from .render import (
     AudioPlayer,
     KeyReader,
     VideoSource,
     fit_grid,
     frame_to_ansi,
 )
-
 from .resolve import Resolved
 
 
