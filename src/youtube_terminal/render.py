@@ -193,6 +193,36 @@ def frame_to_ascii(buf: bytes, width: int, height: int, color: bool = True) -> s
     return "\n".join(out)
 
 
+# Matrix palette by brightness (dark -> bright): black, gray, 3 green tones.
+_MATRIX_PALETTE = [(0, 0, 0), (70, 70, 70), (0, 100, 0), (0, 180, 40), (90, 255, 120)]
+
+
+def frame_to_matrix(buf: bytes, width: int, height: int) -> str:
+    """Render a raw rgb24 frame in Matrix style: half-blocks quantized to
+    5 brightness tones — black, gray and three shades of green."""
+    pal = _MATRIX_PALETTE
+    n = len(pal)
+    row_stride = width * 3
+
+    def tone(r: int, g: int, b: int) -> tuple[int, int, int]:
+        lum = (r * 299 + g * 587 + b * 114) // 1000
+        return pal[min(lum * n // 256, n - 1)]
+
+    out: list[str] = []
+    for ty in range(height):
+        top = ty * 2 * row_stride
+        bot = (ty * 2 + 1) * row_stride
+        cells: list[str] = []
+        for tx in range(width):
+            ti = top + tx * 3
+            bi = bot + tx * 3
+            fr, fg, fb = tone(buf[ti], buf[ti + 1], buf[ti + 2])
+            br, bg, bb = tone(buf[bi], buf[bi + 1], buf[bi + 2])
+            cells.append(f"\x1b[38;2;{fr};{fg};{fb};48;2;{br};{bg};{bb}m▀")
+        out.append("".join(cells))
+    return "\n".join(out)
+
+
 def frame_to_fullblocks(buf: bytes, width: int, height: int) -> str:
     """Render a raw rgb24 frame as solid colored full blocks ('█').
 

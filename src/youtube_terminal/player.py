@@ -20,17 +20,19 @@ from .render import (
     frame_to_ascii,
     frame_to_digits,
     frame_to_fullblocks,
+    frame_to_matrix,
 )
 from .resolve import Resolved
 
 # Display modes, cycled with the "v" key.
-MODES = ("classic", "ascii", "bw", "digit16", "fullblock")
+MODES = ("classic", "ascii", "bw", "digit16", "fullblock", "matrix")
 _MODE_LABELS = {
     "classic": "classic",
     "ascii": "ascii",
     "bw": "b&w",
     "digit16": "16-color digits",
     "fullblock": "full-blocks",
+    "matrix": "matrix",
 }
 
 
@@ -44,6 +46,8 @@ def _render_body(buf: bytes, w: int, h: int, mode: str) -> str:
         return frame_to_digits(buf, w, h)
     if mode == "fullblock":
         return frame_to_fullblocks(buf, w, h)
+    if mode == "matrix":
+        return frame_to_matrix(buf, w, h)
     return frame_to_ansi(buf, w, h)  # classic colored half-blocks
 
 

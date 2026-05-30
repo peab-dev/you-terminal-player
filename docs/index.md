@@ -100,7 +100,7 @@ yt "https://youtu.be/..."                     # short links work too
 | Key | Action |
 |-----|--------|
 | `space` | pause / resume (video **and** audio) |
-| `v` | cycle display mode: **classic** (colored half-blocks) → **ASCII** (oldschool colored ASCII art) → **b&w** (black & white ASCII) → **16-color digits** (digits 0–9 in the classic 16 ANSI colors) → **full-blocks** (solid colored `█` blocks) → classic |
+| `v` | cycle display mode: **classic** (colored half-blocks) → **ASCII** (oldschool colored ASCII art) → **b&w** (black & white ASCII) → **16-color digits** (digits 0–9 in the classic 16 ANSI colors) → **full-blocks** (solid colored `█` blocks) → **matrix** (black/gray + 3 green tones) → classic |
 | `q` / `ESC` | quit |
 
 The audio keeps playing in every mode, so you can flip to oldschool ASCII mid-song.
