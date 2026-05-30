@@ -18,8 +18,22 @@ from .render import (
     VideoSource,
     fit_grid,
     frame_to_ansi,
+    frame_to_ascii,
 )
 from .resolve import Resolved
+
+# Display modes, cycled with the "v" key.
+MODES = ("classic", "ascii", "bw")
+_MODE_LABELS = {"classic": "classic", "ascii": "ascii", "bw": "b&w"}
+
+
+def _render_body(buf: bytes, w: int, h: int, mode: str) -> str:
+    """Render a raw frame in the chosen display mode."""
+    if mode == "ascii":
+        return frame_to_ascii(buf, w, h, color=True)
+    if mode == "bw":
+        return frame_to_ascii(buf, w, h, color=False)
+    return frame_to_ansi(buf, w, h)  # classic colored half-blocks
 
 
 class StreamVideoSource(VideoSource):
@@ -39,13 +53,17 @@ class StreamVideoSource(VideoSource):
         )
 
 
-def _status_bar(title: str, paused: bool) -> str:
+def _status_bar(title: str, paused: bool, mode: str) -> str:
     state = "⏸ paused" if paused else "▶ playing"
-    keys = "[space] pause  [q] quit"
-    return f"\x1b[1m {title} \x1b[0m  \x1b[36m{state}\x1b[0m\x1b[2m   {keys}\x1b[0m"
+    mode_label = _MODE_LABELS.get(mode, mode)
+    keys = "[space] pause  [v] mode  [q] quit"
+    return (
+        f"\x1b[1m {title} \x1b[0m  \x1b[36m{state}\x1b[0m"
+        f"  \x1b[35m{mode_label}\x1b[0m\x1b[2m   {keys}\x1b[0m"
+    )
 
 
-def _compose(body: str, title: str, paused: bool) -> str:
+def _compose(body: str, title: str, paused: bool, mode: str) -> str:
     """Full-screen ANSI frame: centered body + a one-line status bar."""
     size = shutil.get_terminal_size(fallback=(80, 24))
     term_h = size.lines
@@ -60,7 +78,7 @@ def _compose(body: str, title: str, paused: bool) -> str:
     while len(lines) < term_h - 1:
         lines.append("")
     lines = lines[: term_h - 1]
-    lines.append(_status_bar(title, paused))
+    lines.append(_status_bar(title, paused, mode))
 
     parts = ["\x1b[H"]
     for i, line in enumerate(lines):
@@ -91,6 +109,8 @@ def play(resolved: Resolved, want_audio: bool = True) -> None:
     key_reader.start()
 
     paused = False
+    mode_idx = 0          # index into MODES
+    last_buf: bytes | None = None
     last = time.time()
     play_elapsed = 0.0
     frame_idx = 0
@@ -98,9 +118,10 @@ def play(resolved: Resolved, want_audio: bool = True) -> None:
         # Prime the first frame so something shows while audio spins up.
         first = video.read_frame()
         if first is not None:
-            body = frame_to_ansi(first, w, h)
+            last_buf = first
+            body = _render_body(first, w, h, MODES[mode_idx])
             frame_idx = 1
-        sys.stdout.write(_compose(body, resolved.title, paused))
+        sys.stdout.write(_compose(body, resolved.title, paused, MODES[mode_idx]))
         sys.stdout.flush()
         if audio:
             audio.start(0.0)
@@ -119,14 +140,16 @@ def play(resolved: Resolved, want_audio: bool = True) -> None:
                     buf = video.read_frame()
                     if buf is None:  # stream ended
                         if latest is not None:
-                            body = frame_to_ansi(latest, w, h)
-                            sys.stdout.write(_compose(body, resolved.title, paused))
+                            mode = MODES[mode_idx]
+                            body = _render_body(latest, w, h, mode)
+                            sys.stdout.write(_compose(body, resolved.title, paused, mode))
                             sys.stdout.flush()
                         return
                     latest = buf
                     frame_idx += 1
                 if latest is not None:
-                    body = frame_to_ansi(latest, w, h)
+                    last_buf = latest
+                    body = _render_body(latest, w, h, MODES[mode_idx])
                     redraw = True
 
             key = key_reader.get_key()
@@ -141,10 +164,16 @@ def play(resolved: Resolved, want_audio: bool = True) -> None:
                         else:
                             audio.start(play_elapsed)
                     redraw = True
+                elif key == "v":
+                    # Cycle display mode: classic -> ascii -> b&w -> classic.
+                    mode_idx = (mode_idx + 1) % len(MODES)
+                    if last_buf is not None:
+                        body = _render_body(last_buf, w, h, MODES[mode_idx])
+                    redraw = True
                 key = key_reader.get_key()
 
             if redraw:
-                sys.stdout.write(_compose(body, resolved.title, paused))
+                sys.stdout.write(_compose(body, resolved.title, paused, MODES[mode_idx]))
                 sys.stdout.flush()
 
             if not paused:

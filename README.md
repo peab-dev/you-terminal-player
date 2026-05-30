@@ -43,7 +43,7 @@ yt --no-audio "<url>"                       # silent
 yt --cookies-from-browser safari "<url>"    # if YouTube says "confirm you're not a bot"
 ```
 
-**Controls:** `space` = pause/resume · `q` / `ESC` = quit
+**Controls:** `space` = pause/resume · `v` = display mode (classic → ASCII → b&w) · `q` / `ESC` = quit
 **Tip:** enlarge the window + shrink the font (`Cmd` `-`) for a sharper picture.
 
 Uninstall with `./uninstall.sh`. See the

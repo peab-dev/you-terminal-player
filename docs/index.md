@@ -100,7 +100,10 @@ yt "https://youtu.be/..."                     # short links work too
 | Key | Action |
 |-----|--------|
 | `space` | pause / resume (video **and** audio) |
+| `v` | cycle display mode: **classic** (colored half-blocks) → **ASCII** (oldschool colored ASCII art) → **b&w** (black & white ASCII) → classic |
 | `q` / `ESC` | quit |
+
+The audio keeps playing in every mode, so you can flip to oldschool ASCII mid-song.
 
 > **Tip:** make the terminal window larger and shrink the font (`Cmd` `-`) before
 > launching — more cells = a sharper picture. The grid is fixed when playback

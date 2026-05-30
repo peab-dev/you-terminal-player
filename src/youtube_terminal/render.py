@@ -157,6 +157,42 @@ def frame_to_ansi(buf: bytes, width: int, height: int) -> str:
     return "\n".join(out)
 
 
+# Brightness ramp for ASCII mode, dark -> light (classic "oldschool" look).
+_ASCII_RAMP = " .:-=+*#%@"
+
+
+def frame_to_ascii(buf: bytes, width: int, height: int, color: bool = True) -> str:
+    """Render a raw rgb24 frame as ASCII art (one character per cell).
+
+    The two stacked pixels of each cell are averaged (so the aspect ratio stays
+    correct), then mapped to a character by brightness. With ``color`` the
+    character takes the pixel's truecolor; otherwise a grayscale (black & white)
+    shade based on its luminance.
+    """
+    ramp = _ASCII_RAMP
+    last = len(ramp) - 1
+    row_stride = width * 3
+    out: list[str] = []
+    for ty in range(height):
+        top = ty * 2 * row_stride
+        bot = (ty * 2 + 1) * row_stride
+        cells: list[str] = []
+        for tx in range(width):
+            ti = top + tx * 3
+            bi = bot + tx * 3
+            r = (buf[ti] + buf[bi]) >> 1
+            g = (buf[ti + 1] + buf[bi + 1]) >> 1
+            b = (buf[ti + 2] + buf[bi + 2]) >> 1
+            lum = (r * 299 + g * 587 + b * 114) // 1000
+            ch = ramp[lum * last // 255]
+            if color:
+                cells.append(f"\x1b[38;2;{r};{g};{b}m{ch}")
+            else:
+                cells.append(f"\x1b[38;2;{lum};{lum};{lum}m{ch}")
+        out.append("".join(cells))
+    return "\n".join(out)
+
+
 class VideoSource:
     """Streams a video as raw rgb24 half-block frames using an ffmpeg pipe.
 
