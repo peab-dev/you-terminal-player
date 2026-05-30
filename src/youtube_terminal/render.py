@@ -200,23 +200,31 @@ class VideoSource:
     height*2 rows) at the requested fps, so each read is one ready frame.
     """
 
-    def __init__(self, path: str | Path, width: int, height: int, fps: float = 24.0):
+    def __init__(
+        self, path: str | Path, width: int, height: int,
+        fps: float = 24.0, start: float = 0.0,
+    ):
         self.path = path
         self.width = width
         self.height = height
         self.fps = fps
+        self.start = start  # seek offset in seconds (for resume after resize)
         self.frame_bytes = width * (height * 2) * 3
         self.proc: subprocess.Popen[bytes] | None = None
         self._start()
+
+    def _ffmpeg_cmd(self, ffmpeg: str) -> list[str]:
+        seek = ["-ss", f"{self.start:.3f}"] if self.start > 0 else []
+        return [ffmpeg, "-loglevel", "quiet", *seek, "-i", str(self.path),
+                "-vf", f"scale={self.width}:{self.height * 2},fps={self.fps}",
+                "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
 
     def _start(self) -> None:
         ffmpeg = shutil.which("ffmpeg")
         if not ffmpeg:
             return
         self.proc = subprocess.Popen(
-            [ffmpeg, "-loglevel", "quiet", "-i", str(self.path),
-             "-vf", f"scale={self.width}:{self.height * 2},fps={self.fps}",
-             "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+            self._ffmpeg_cmd(ffmpeg),
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         )
 

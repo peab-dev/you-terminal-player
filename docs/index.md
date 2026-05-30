@@ -105,9 +105,12 @@ yt "https://youtu.be/..."                     # short links work too
 
 The audio keeps playing in every mode, so you can flip to oldschool ASCII mid-song.
 
-> **Tip:** make the terminal window larger and shrink the font (`Cmd` `-`) before
-> launching — more cells = a sharper picture. The grid is fixed when playback
-> starts.
+**Resize anytime:** when you resize the terminal window (or change the font size),
+the picture automatically refits to fill the new size — aspect ratio preserved,
+no stretching — and resumes at the current position.
+
+> **Tip:** a larger window and a smaller font (`Cmd` `-`) = more cells = a sharper
+> picture.
 
 ---
 

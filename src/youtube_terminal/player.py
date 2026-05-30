@@ -8,7 +8,6 @@ single-video playback loop.
 from __future__ import annotations
 
 import shutil
-import subprocess
 import sys
 import time
 
@@ -37,20 +36,18 @@ def _render_body(buf: bytes, w: int, h: int, mode: str) -> str:
 
 
 class StreamVideoSource(VideoSource):
-    """VideoSource that reads a network URL, with ffmpeg auto-reconnect."""
+    """VideoSource that reads a network URL, with ffmpeg auto-reconnect.
 
-    def _start(self) -> None:
-        ffmpeg = shutil.which("ffmpeg")
-        if not ffmpeg:
-            return
-        self.proc = subprocess.Popen(
-            [ffmpeg, "-loglevel", "quiet",
-             "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
-             "-i", str(self.path),
-             "-vf", f"scale={self.width}:{self.height * 2},fps={self.fps}",
-             "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-        )
+    Inherits seek support (``start``) from VideoSource, so it can resume at the
+    current position after a terminal resize rebuilds the decoder.
+    """
+
+    def _ffmpeg_cmd(self, ffmpeg: str) -> list[str]:
+        cmd = super()._ffmpeg_cmd(ffmpeg)
+        i = cmd.index("-i")  # reconnect flags are input options -> before -i
+        reconnect = ["-reconnect", "1", "-reconnect_streamed", "1",
+                     "-reconnect_delay_max", "5"]
+        return cmd[:i] + reconnect + cmd[i:]
 
 
 def _status_bar(title: str, paused: bool, mode: str) -> str:
@@ -91,6 +88,7 @@ def _compose(body: str, title: str, paused: bool, mode: str) -> str:
 def play(resolved: Resolved, want_audio: bool = True) -> None:
     """Stream and play the resolved video in the terminal until it ends or 'q'."""
     size = shutil.get_terminal_size(fallback=(80, 24))
+    term_size = (size.columns, size.lines)
     w, h = fit_grid(
         resolved.width, resolved.height, size.columns, size.lines,
         reserve_bottom_lines=1,
@@ -131,6 +129,32 @@ def play(resolved: Resolved, want_audio: bool = True) -> None:
             dt = now - last
             last = now
             redraw = False
+
+            # React to terminal resize: refit the grid (filling the terminal,
+            # aspect preserved) and rebuild the decoder at the current position.
+            size = shutil.get_terminal_size(fallback=(80, 24))
+            if (size.columns, size.lines) != term_size:
+                term_size = (size.columns, size.lines)
+                nw, nh = fit_grid(
+                    resolved.width, resolved.height, size.columns, size.lines,
+                    reserve_bottom_lines=1,
+                )
+                if (nw, nh) != (w, h):
+                    w, h = nw, nh
+                    video.close()
+                    video = StreamVideoSource(
+                        resolved.video_url, w, h, fps=resolved.fps, start=play_elapsed,
+                    )
+                    frame_idx = int(play_elapsed * video.fps)
+                    rb = video.read_frame()
+                    if rb is not None:
+                        frame_idx += 1
+                        body = _render_body(rb, w, h, MODES[mode_idx])
+                    else:
+                        body = ""  # next frames refresh it; old buffer size differs
+                    last_buf = rb  # always matches the current (w, h)
+                sys.stdout.write("\x1b[2J")  # clear stale cells from the old size
+                redraw = True
 
             if not paused:
                 play_elapsed += dt
