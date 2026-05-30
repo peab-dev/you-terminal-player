@@ -22,7 +22,10 @@ from .render import (
     frame_to_fullblocks,
     frame_to_matrix,
 )
-from .resolve import Resolved
+from .resolve import Resolved, ResolveError, resolve
+
+# Source resolutions cycled with the "R" key.
+RES_OPTIONS = [240, 360, 480, 720, 1080]
 
 # Display modes, cycled with the "v" key.
 MODES = ("classic", "ascii", "bw", "digit16", "fullblock", "matrix")
@@ -66,16 +69,16 @@ class StreamVideoSource(VideoSource):
         return cmd[:i] + reconnect + cmd[i:]
 
 
-def _status_bar(title: str, paused: bool, label: str, dims: str) -> str:
+def _status_bar(title: str, paused: bool, label: str, extra: str) -> str:
     state = "⏸ paused" if paused else "▶ playing"
-    info = "\x1b[2m[space] pause  [v] mode  [q] quit\x1b[0m"
+    info = "\x1b[2m[space] pause  [v] mode  [r] res  [f] fps  [q] quit\x1b[0m"
     return (
         f"\x1b[1m {title} \x1b[0m  \x1b[36m{state}\x1b[0m"
-        f"  \x1b[35m{label}\x1b[0m  \x1b[2m{dims}\x1b[0m   {info}"
+        f"  \x1b[35m{label}\x1b[0m  \x1b[2m{extra}\x1b[0m   {info}"
     )
 
 
-def _compose(body: str, title: str, paused: bool, label: str, dims: str) -> str:
+def _compose(body: str, title: str, paused: bool, label: str, extra: str) -> str:
     """Full-screen ANSI frame: centered body + a one-line status bar."""
     term_h = shutil.get_terminal_size(fallback=(80, 24)).lines
     avail = max(term_h - 1, 1)  # reserve the last line for the status bar
@@ -89,7 +92,7 @@ def _compose(body: str, title: str, paused: bool, label: str, dims: str) -> str:
     while len(lines) < term_h - 1:
         lines.append("")
     lines = lines[: term_h - 1]
-    lines.append(_status_bar(title, paused, label, dims))
+    lines.append(_status_bar(title, paused, label, extra))
 
     parts = ["\x1b[H"]
     for i, line in enumerate(lines):
@@ -99,12 +102,32 @@ def _compose(body: str, title: str, paused: bool, label: str, dims: str) -> str:
     return "".join(parts)
 
 
-def play(resolved: Resolved, want_audio: bool = True) -> None:
-    """Stream and play the resolved video in the terminal until it ends or 'q'."""
+def play(
+    resolved: Resolved,
+    want_audio: bool = True,
+    *,
+    url: str = "",
+    max_height: int | None = 720,
+    cookies_from_browser: str | None = None,
+    player_client: str | None = None,
+) -> None:
+    """Stream and play the resolved video in the terminal until it ends or 'q'.
+
+    `url`/cookies/`player_client` are kept so the "R" key can re-resolve the
+    stream at a different source resolution.
+    """
     mode_idx = 0                   # index into MODES
     w = h = 0                      # current decoder dimensions (cells)
     paused = False
     last_buf: bytes | None = None
+
+    # Resolution ("R") starts at the option closest to what we resolved.
+    res_idx = min(range(len(RES_OPTIONS)), key=lambda i: abs(RES_OPTIONS[i] - resolved.height))
+    # fps ("F"): 15/24/30/60 plus the original frame rate, within 15..60.
+    fps_options = sorted({15.0, 24.0, 30.0, 60.0, round(float(resolved.fps), 3)})
+    fps_options = [f for f in fps_options if 15.0 <= f <= 60.0] or [float(resolved.fps)]
+    fps_idx = min(range(len(fps_options)), key=lambda i: abs(fps_options[i] - resolved.fps))
+    current_fps = fps_options[fps_idx]
 
     def make_decoder(start: float) -> StreamVideoSource:
         """Build the decoder for the current terminal size at position `start`."""
@@ -113,14 +136,15 @@ def play(resolved: Resolved, want_audio: bool = True) -> None:
         w, h = fit_grid(
             resolved.width, resolved.height, sz.columns, sz.lines, reserve_bottom_lines=1
         )
-        return StreamVideoSource(resolved.video_url, w, h, fps=resolved.fps, start=start)
+        return StreamVideoSource(resolved.video_url, w, h, fps=current_fps, start=start)
 
     def render_current() -> None:
         if last_buf is None:
             return
         body = _render_body(last_buf, w, h, MODES[mode_idx])
         label = _MODE_LABELS[MODES[mode_idx]]
-        sys.stdout.write(_compose(body, resolved.title, paused, label, f"{w}×{h}"))
+        extra = f"{RES_OPTIONS[res_idx]}p·{current_fps:g}fps·{w}×{h}"
+        sys.stdout.write(_compose(body, resolved.title, paused, label, extra))
         sys.stdout.flush()
 
     audio: AudioPlayer | None = None
@@ -196,6 +220,49 @@ def play(resolved: Resolved, want_audio: bool = True) -> None:
                     dirty = True
                 elif key == "v":
                     mode_idx = (mode_idx + 1) % len(MODES)
+                    dirty = True
+                elif key == "r":
+                    # Cycle source resolution: re-resolve the stream at the new
+                    # cap, rebuild the decoder + audio at the current position.
+                    res_idx = (res_idx + 1) % len(RES_OPTIONS)
+                    try:
+                        newres = resolve(
+                            url, max_height=RES_OPTIONS[res_idx],
+                            cookies_from_browser=cookies_from_browser,
+                            player_client=player_client,
+                        )
+                    except ResolveError:
+                        newres = None
+                    if newres is not None:
+                        resolved = newres
+                        video.close()
+                        video = make_decoder(play_elapsed)
+                        frame_idx = int(play_elapsed * video.fps)
+                        if audio:
+                            audio.stop()
+                        audio = (
+                            AudioPlayer(resolved.audio_url)
+                            if want_audio and resolved.audio_url else None
+                        )
+                        if audio and not paused:
+                            audio.start(play_elapsed)
+                        last_buf = video.read_frame()
+                        if last_buf is not None:
+                            frame_idx += 1
+                        sys.stdout.write("\x1b[2J")
+                        last = time.time()  # don't count the re-resolve as elapsed
+                    dirty = True
+                elif key == "f":
+                    # Cycle frame rate: rebuild the decoder at the new fps.
+                    fps_idx = (fps_idx + 1) % len(fps_options)
+                    current_fps = fps_options[fps_idx]
+                    video.close()
+                    video = make_decoder(play_elapsed)
+                    frame_idx = int(play_elapsed * video.fps)
+                    last_buf = video.read_frame()
+                    if last_buf is not None:
+                        frame_idx += 1
+                    last = time.time()
                     dirty = True
                 key = key_reader.get_key()
 

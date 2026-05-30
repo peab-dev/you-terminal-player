@@ -101,7 +101,12 @@ yt "https://youtu.be/..."                     # short links work too
 |-----|--------|
 | `space` | pause / resume (video **and** audio) |
 | `v` | cycle display mode: **classic** (colored half-blocks) → **ASCII** (oldschool colored ASCII art) → **b&w** (black & white ASCII) → **16-color digits** (digits 0–9 in the classic 16 ANSI colors) → **full-blocks** (solid colored `█` blocks) → **matrix** (black/gray + 3 green tones) → classic |
+| `r` | cycle source resolution: 240 → 360 → 480 → 720 → 1080 (re-fetches the stream at that quality) |
+| `f` | cycle frame rate: 15 → 24 → 30 → 60, plus the video's original fps |
 | `q` / `ESC` | quit |
+
+The current mode, resolution and fps are shown in the status line. Audio keeps
+playing in sync across all of these changes.
 
 The audio keeps playing in every mode, so you can flip to oldschool ASCII mid-song.
 

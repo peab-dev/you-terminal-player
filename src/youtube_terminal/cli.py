@@ -62,7 +62,14 @@ def main() -> None:
         print(f"Error: {exc}")
         sys.exit(1)
 
-    play(resolved, want_audio=not args.no_audio)
+    play(
+        resolved,
+        want_audio=not args.no_audio,
+        url=args.url,
+        max_height=_RES_CHOICES[args.res],
+        cookies_from_browser=args.cookies_from_browser,
+        player_client=args.player_client,
+    )
 
 
 if __name__ == "__main__":
