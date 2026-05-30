@@ -67,20 +67,21 @@ class StreamVideoSource(VideoSource):
         return cmd[:i] + reconnect + cmd[i:]
 
 
-def _status_bar(title: str, paused: bool, mode: str, note: str = "") -> str:
+def _status_bar(title: str, paused: bool, label: str, dims: str, note: str = "") -> str:
     state = "⏸ paused" if paused else "▶ playing"
-    mode_label = _MODE_LABELS.get(mode, mode)
     if note:
         info = f"\x1b[33m{note}\x1b[0m"
     else:
         info = "\x1b[2m[space] pause  [v] mode  [g] gpu  [q] quit\x1b[0m"
     return (
         f"\x1b[1m {title} \x1b[0m  \x1b[36m{state}\x1b[0m"
-        f"  \x1b[35m{mode_label}\x1b[0m   {info}"
+        f"  \x1b[35m{label}\x1b[0m  \x1b[2m{dims}\x1b[0m   {info}"
     )
 
 
-def _compose(body: str, title: str, paused: bool, mode: str, note: str = "") -> str:
+def _compose(
+    body: str, title: str, paused: bool, label: str, dims: str, note: str = ""
+) -> str:
     """Full-screen ANSI frame: centered body + a one-line status bar."""
     term_h = shutil.get_terminal_size(fallback=(80, 24)).lines
     avail = max(term_h - 1, 1)  # reserve the last line for the status bar
@@ -94,7 +95,7 @@ def _compose(body: str, title: str, paused: bool, mode: str, note: str = "") -> 
     while len(lines) < term_h - 1:
         lines.append("")
     lines = lines[: term_h - 1]
-    lines.append(_status_bar(title, paused, mode, note))
+    lines.append(_status_bar(title, paused, label, dims, note))
 
     parts = ["\x1b[H"]
     for i, line in enumerate(lines):
@@ -121,7 +122,9 @@ def play(resolved: Resolved, want_audio: bool = True, gpu_start: bool = False) -
         sz = shutil.get_terminal_size(fallback=(80, 24))
         if image_mode and img_proto:
             px = gpu.terminal_pixel_size() or (sz.columns * 10, sz.lines * 20)
-            w, h = gpu.fit_pixels(resolved.width, resolved.height, px[0], px[1])
+            cell_h = max(px[1] // max(sz.lines, 1), 1)
+            avail_h = max(px[1] - cell_h, 1)  # leave one row for the status bar
+            w, h = gpu.fit_pixels(resolved.width, resolved.height, px[0], avail_h)
             return StreamVideoSource(
                 resolved.video_url, w, h, fps=resolved.fps, start=start, pixels=True
             )
@@ -133,16 +136,21 @@ def play(resolved: Resolved, want_audio: bool = True, gpu_start: bool = False) -
     def render_current() -> None:
         if last_buf is None:
             return
+        note = notice if time.time() < notice_until else ""
         if image_mode and img_proto:
+            sz = shutil.get_terminal_size(fallback=(80, 24))
             if img_proto == "iterm":
-                sz = shutil.get_terminal_size(fallback=(80, 24))
-                sys.stdout.write(gpu.iterm_frame(last_buf, w, h, sz.columns, sz.lines))
+                sys.stdout.write(gpu.iterm_frame(last_buf, w, h, sz.columns, sz.lines - 1))
             else:
                 sys.stdout.write(gpu.kitty_frame(last_buf, w, h))
+            bar = _status_bar(resolved.title, paused, f"gpu·{img_proto}", f"{w}×{h}px", note)
+            sys.stdout.write(f"\x1b[{sz.lines};1H\x1b[0m{bar}\x1b[0m\x1b[K")  # bottom row
         else:
-            note = notice if time.time() < notice_until else ""
             body = _render_body(last_buf, w, h, MODES[mode_idx])
-            sys.stdout.write(_compose(body, resolved.title, paused, MODES[mode_idx], note))
+            label = _MODE_LABELS[MODES[mode_idx]]
+            sys.stdout.write(
+                _compose(body, resolved.title, paused, label, f"{w}×{h}", note)
+            )
         sys.stdout.flush()
 
     audio: AudioPlayer | None = None
