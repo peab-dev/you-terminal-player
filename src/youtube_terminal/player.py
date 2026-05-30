@@ -104,10 +104,10 @@ def _compose(body: str, title: str, paused: bool, mode: str, note: str = "") -> 
     return "".join(parts)
 
 
-def play(resolved: Resolved, want_audio: bool = True) -> None:
+def play(resolved: Resolved, want_audio: bool = True, gpu_start: bool = False) -> None:
     """Stream and play the resolved video in the terminal until it ends or 'q'."""
-    img_proto = gpu.detect_image_protocol()  # "kitty" or None
-    image_mode = False                       # toggled with "g"
+    img_proto = gpu.detect_image_protocol()  # "kitty" | "iterm" | None
+    image_mode = bool(gpu_start and img_proto)  # start in GPU mode if asked & able
     mode_idx = 0                             # index into MODES (block renderers)
     w = h = 0                                # current decoder dimensions
     paused = False
@@ -134,7 +134,11 @@ def play(resolved: Resolved, want_audio: bool = True) -> None:
         if last_buf is None:
             return
         if image_mode and img_proto:
-            sys.stdout.write(gpu.kitty_frame(last_buf, w, h))
+            if img_proto == "iterm":
+                sz = shutil.get_terminal_size(fallback=(80, 24))
+                sys.stdout.write(gpu.iterm_frame(last_buf, w, h, sz.columns, sz.lines))
+            else:
+                sys.stdout.write(gpu.kitty_frame(last_buf, w, h))
         else:
             note = notice if time.time() < notice_until else ""
             body = _render_body(last_buf, w, h, MODES[mode_idx])
@@ -217,7 +221,7 @@ def play(resolved: Resolved, want_audio: bool = True) -> None:
                     dirty = True
                 elif key == "g":
                     if img_proto is None:
-                        notice = "GPU image mode needs kitty / WezTerm / Ghostty"
+                        notice = "GPU image mode needs kitty / WezTerm / Ghostty / iTerm2"
                         notice_until = now + 2.5
                     else:
                         image_mode = not image_mode

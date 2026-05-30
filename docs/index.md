@@ -107,10 +107,14 @@ yt "https://youtu.be/..."                     # short links work too
 ### GPU image mode (`g`)
 
 Press `g` for true, smooth pixel video: instead of character cells, the frames
-are sent via the **kitty graphics protocol** and drawn by the terminal's GPU —
-highest fidelity and frame rate. It needs a supporting terminal
-(**kitty**, **WezTerm** or **Ghostty**); in others (e.g. Apple Terminal) `g`
-just shows a hint and stays in the character renderers.
+are sent via a terminal image protocol and drawn by the terminal's GPU — highest
+fidelity and frame rate. Two protocols are supported and auto-detected:
+
+- **kitty graphics protocol** — kitty, WezTerm, Ghostty (raw RGB, lightest);
+- **iTerm2 inline images** — iTerm2 (PNG-encoded frames).
+
+In other terminals (e.g. Apple Terminal) `g` just shows a hint and stays in the
+character renderers. You can also start directly in GPU mode with `yt --gpu`.
 
 Why this and not, say, `ffmpeg -hwaccel`? Profiling showed the character
 renderers are already fast (~0.3 µs/cell); the real limit is how quickly the

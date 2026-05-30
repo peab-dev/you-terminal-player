@@ -40,10 +40,11 @@ yt                                         # default video
 yt "https://www.youtube.com/watch?v=..."   # a specific video
 yt --res 1080 "<url>"                       # higher resolution
 yt --no-audio "<url>"                       # silent
+yt --gpu "<url>"                            # start in GPU image mode (kitty/iTerm2/…)
 yt --cookies-from-browser safari "<url>"    # if YouTube says "confirm you're not a bot"
 ```
 
-**Controls:** `space` = pause/resume · `v` = display mode (classic → ASCII → b&w → 16-color digits → full-blocks → matrix) · `g` = GPU image mode (real pixel video; needs kitty/WezTerm/Ghostty) · `q` / `ESC` = quit
+**Controls:** `space` = pause/resume · `v` = display mode (classic → ASCII → b&w → 16-color digits → full-blocks → matrix) · `g` = GPU image mode (real pixel video; needs kitty/WezTerm/Ghostty/iTerm2) · `q` / `ESC` = quit
 **Resize the window anytime** — the picture refits to fill it (aspect preserved, no stretching).
 **Tip:** enlarge the window + shrink the font (`Cmd` `-`) for a sharper picture.
 
