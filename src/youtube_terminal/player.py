@@ -11,7 +11,6 @@ import shutil
 import sys
 import time
 
-from . import gpu
 from .render import (
     AudioPlayer,
     KeyReader,
@@ -67,21 +66,16 @@ class StreamVideoSource(VideoSource):
         return cmd[:i] + reconnect + cmd[i:]
 
 
-def _status_bar(title: str, paused: bool, label: str, dims: str, note: str = "") -> str:
+def _status_bar(title: str, paused: bool, label: str, dims: str) -> str:
     state = "⏸ paused" if paused else "▶ playing"
-    if note:
-        info = f"\x1b[33m{note}\x1b[0m"
-    else:
-        info = "\x1b[2m[space] pause  [v] mode  [g] gpu  [q] quit\x1b[0m"
+    info = "\x1b[2m[space] pause  [v] mode  [q] quit\x1b[0m"
     return (
         f"\x1b[1m {title} \x1b[0m  \x1b[36m{state}\x1b[0m"
         f"  \x1b[35m{label}\x1b[0m  \x1b[2m{dims}\x1b[0m   {info}"
     )
 
 
-def _compose(
-    body: str, title: str, paused: bool, label: str, dims: str, note: str = ""
-) -> str:
+def _compose(body: str, title: str, paused: bool, label: str, dims: str) -> str:
     """Full-screen ANSI frame: centered body + a one-line status bar."""
     term_h = shutil.get_terminal_size(fallback=(80, 24)).lines
     avail = max(term_h - 1, 1)  # reserve the last line for the status bar
@@ -95,7 +89,7 @@ def _compose(
     while len(lines) < term_h - 1:
         lines.append("")
     lines = lines[: term_h - 1]
-    lines.append(_status_bar(title, paused, label, dims, note))
+    lines.append(_status_bar(title, paused, label, dims))
 
     parts = ["\x1b[H"]
     for i, line in enumerate(lines):
@@ -105,29 +99,17 @@ def _compose(
     return "".join(parts)
 
 
-def play(resolved: Resolved, want_audio: bool = True, gpu_start: bool = False) -> None:
+def play(resolved: Resolved, want_audio: bool = True) -> None:
     """Stream and play the resolved video in the terminal until it ends or 'q'."""
-    img_proto = gpu.detect_image_protocol()  # "kitty" | "iterm" | None
-    image_mode = bool(gpu_start and img_proto)  # start in GPU mode if asked & able
-    mode_idx = 0                             # index into MODES (block renderers)
-    w = h = 0                                # current decoder dimensions
+    mode_idx = 0                   # index into MODES
+    w = h = 0                      # current decoder dimensions (cells)
     paused = False
     last_buf: bytes | None = None
-    notice = ""
-    notice_until = 0.0
 
     def make_decoder(start: float) -> StreamVideoSource:
-        """Build a decoder for the current state (image vs block) at `start`."""
+        """Build the decoder for the current terminal size at position `start`."""
         nonlocal w, h
         sz = shutil.get_terminal_size(fallback=(80, 24))
-        if image_mode and img_proto:
-            px = gpu.terminal_pixel_size() or (sz.columns * 10, sz.lines * 20)
-            cell_h = max(px[1] // max(sz.lines, 1), 1)
-            avail_h = max(px[1] - cell_h, 1)  # leave one row for the status bar
-            w, h = gpu.fit_pixels(resolved.width, resolved.height, px[0], avail_h)
-            return StreamVideoSource(
-                resolved.video_url, w, h, fps=resolved.fps, start=start, pixels=True
-            )
         w, h = fit_grid(
             resolved.width, resolved.height, sz.columns, sz.lines, reserve_bottom_lines=1
         )
@@ -136,21 +118,9 @@ def play(resolved: Resolved, want_audio: bool = True, gpu_start: bool = False) -
     def render_current() -> None:
         if last_buf is None:
             return
-        note = notice if time.time() < notice_until else ""
-        if image_mode and img_proto:
-            sz = shutil.get_terminal_size(fallback=(80, 24))
-            if img_proto == "iterm":
-                sys.stdout.write(gpu.iterm_frame(last_buf, w, h, sz.columns, sz.lines - 1))
-            else:
-                sys.stdout.write(gpu.kitty_frame(last_buf, w, h))
-            bar = _status_bar(resolved.title, paused, f"gpu·{img_proto}", f"{w}×{h}px", note)
-            sys.stdout.write(f"\x1b[{sz.lines};1H\x1b[0m{bar}\x1b[0m\x1b[K")  # bottom row
-        else:
-            body = _render_body(last_buf, w, h, MODES[mode_idx])
-            label = _MODE_LABELS[MODES[mode_idx]]
-            sys.stdout.write(
-                _compose(body, resolved.title, paused, label, f"{w}×{h}", note)
-            )
+        body = _render_body(last_buf, w, h, MODES[mode_idx])
+        label = _MODE_LABELS[MODES[mode_idx]]
+        sys.stdout.write(_compose(body, resolved.title, paused, label, f"{w}×{h}"))
         sys.stdout.flush()
 
     audio: AudioPlayer | None = None
@@ -227,26 +197,7 @@ def play(resolved: Resolved, want_audio: bool = True, gpu_start: bool = False) -
                 elif key == "v":
                     mode_idx = (mode_idx + 1) % len(MODES)
                     dirty = True
-                elif key == "g":
-                    if img_proto is None:
-                        notice = "GPU image mode needs kitty / WezTerm / Ghostty / iTerm2"
-                        notice_until = now + 2.5
-                    else:
-                        image_mode = not image_mode
-                        video.close()
-                        video = make_decoder(play_elapsed)
-                        frame_idx = int(play_elapsed * video.fps)
-                        if img_proto == "kitty":
-                            sys.stdout.write("\x1b_Ga=d\x1b\\")  # clear images
-                        sys.stdout.write("\x1b[2J")
-                        last_buf = video.read_frame()
-                        if last_buf is not None:
-                            frame_idx += 1
-                    dirty = True
                 key = key_reader.get_key()
-
-            if time.time() < notice_until:
-                dirty = True  # keep the notice visible briefly
 
             if dirty:
                 render_current()
@@ -263,7 +214,5 @@ def play(resolved: Resolved, want_audio: bool = True, gpu_start: bool = False) -
             audio.stop()
         video.close()
         key_reader.stop()
-        if img_proto == "kitty":
-            sys.stdout.write("\x1b_Ga=d\x1b\\")  # delete any leftover images
         sys.stdout.write("\x1b[?25h\x1b[2J\x1b[H")  # show cursor, clear
         sys.stdout.flush()

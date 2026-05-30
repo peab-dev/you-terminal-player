@@ -301,25 +301,21 @@ class VideoSource:
 
     def __init__(
         self, path: str | Path, width: int, height: int,
-        fps: float = 24.0, start: float = 0.0, pixels: bool = False,
+        fps: float = 24.0, start: float = 0.0,
     ):
         self.path = path
         self.width = width
         self.height = height
         self.fps = fps
         self.start = start  # seek offset in seconds (for resume after resize)
-        # pixels=True: decode width x height true pixels (GPU image mode);
-        # otherwise width x (height*2) for the half-block renderers.
-        self.pixels = pixels
-        self.scale_h = height if pixels else height * 2
-        self.frame_bytes = width * self.scale_h * 3
+        self.frame_bytes = width * (height * 2) * 3
         self.proc: subprocess.Popen[bytes] | None = None
         self._start()
 
     def _ffmpeg_cmd(self, ffmpeg: str) -> list[str]:
         seek = ["-ss", f"{self.start:.3f}"] if self.start > 0 else []
         return [ffmpeg, "-loglevel", "quiet", *seek, "-i", str(self.path),
-                "-vf", f"scale={self.width}:{self.scale_h},fps={self.fps}",
+                "-vf", f"scale={self.width}:{self.height * 2},fps={self.fps}",
                 "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
 
     def _start(self) -> None:

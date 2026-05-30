@@ -31,11 +31,6 @@ def main() -> None:
         "--no-audio", action="store_true", help="Play without the soundtrack",
     )
     parser.add_argument(
-        "--gpu", action="store_true",
-        help="Start in GPU image mode (real pixel video; needs kitty/WezTerm/"
-             "Ghostty/iTerm2). Toggle anytime with the 'g' key.",
-    )
-    parser.add_argument(
         "--cookies-from-browser", metavar="BROWSER", default=None,
         help="Use cookies from this browser (safari, chrome, firefox, ...) if "
              "YouTube asks to confirm you're not a bot",
@@ -67,7 +62,7 @@ def main() -> None:
         print(f"Error: {exc}")
         sys.exit(1)
 
-    play(resolved, want_audio=not args.no_audio, gpu_start=args.gpu)
+    play(resolved, want_audio=not args.no_audio)
 
 
 if __name__ == "__main__":

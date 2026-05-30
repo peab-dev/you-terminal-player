@@ -101,26 +101,7 @@ yt "https://youtu.be/..."                     # short links work too
 |-----|--------|
 | `space` | pause / resume (video **and** audio) |
 | `v` | cycle display mode: **classic** (colored half-blocks) → **ASCII** (oldschool colored ASCII art) → **b&w** (black & white ASCII) → **16-color digits** (digits 0–9 in the classic 16 ANSI colors) → **full-blocks** (solid colored `█` blocks) → **matrix** (black/gray + 3 green tones) → classic |
-| `g` | toggle **GPU image mode** — real pixel video rendered by the terminal's GPU (see below) |
 | `q` / `ESC` | quit |
-
-### GPU image mode (`g`)
-
-Press `g` for true, smooth pixel video: instead of character cells, the frames
-are sent via a terminal image protocol and drawn by the terminal's GPU — highest
-fidelity and frame rate. Two protocols are supported and auto-detected:
-
-- **kitty graphics protocol** — kitty, WezTerm, Ghostty (raw RGB, lightest);
-- **iTerm2 inline images** — iTerm2 (PNG-encoded frames).
-
-In other terminals (e.g. Apple Terminal) `g` just shows a hint and stays in the
-character renderers. You can also start directly in GPU mode with `yt --gpu`.
-
-Why this and not, say, `ffmpeg -hwaccel`? Profiling showed the character
-renderers are already fast (~0.3 µs/cell); the real limit is how quickly the
-terminal can paint truecolor cells. So the biggest wins are a **GPU-accelerated
-terminal** and this image protocol. (Hardware video decode was skipped on
-purpose: it barely helps at these sizes and can stall VP9/AV1 streams.)
 
 The audio keeps playing in every mode, so you can flip to oldschool ASCII mid-song.
 
