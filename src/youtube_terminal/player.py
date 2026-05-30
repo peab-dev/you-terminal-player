@@ -11,6 +11,7 @@ import shutil
 import sys
 import time
 
+from . import gpu
 from .render import (
     AudioPlayer,
     KeyReader,
@@ -66,20 +67,22 @@ class StreamVideoSource(VideoSource):
         return cmd[:i] + reconnect + cmd[i:]
 
 
-def _status_bar(title: str, paused: bool, mode: str) -> str:
+def _status_bar(title: str, paused: bool, mode: str, note: str = "") -> str:
     state = "⏸ paused" if paused else "▶ playing"
     mode_label = _MODE_LABELS.get(mode, mode)
-    keys = "[space] pause  [v] mode  [q] quit"
+    if note:
+        info = f"\x1b[33m{note}\x1b[0m"
+    else:
+        info = "\x1b[2m[space] pause  [v] mode  [g] gpu  [q] quit\x1b[0m"
     return (
         f"\x1b[1m {title} \x1b[0m  \x1b[36m{state}\x1b[0m"
-        f"  \x1b[35m{mode_label}\x1b[0m\x1b[2m   {keys}\x1b[0m"
+        f"  \x1b[35m{mode_label}\x1b[0m   {info}"
     )
 
 
-def _compose(body: str, title: str, paused: bool, mode: str) -> str:
+def _compose(body: str, title: str, paused: bool, mode: str, note: str = "") -> str:
     """Full-screen ANSI frame: centered body + a one-line status bar."""
-    size = shutil.get_terminal_size(fallback=(80, 24))
-    term_h = size.lines
+    term_h = shutil.get_terminal_size(fallback=(80, 24)).lines
     avail = max(term_h - 1, 1)  # reserve the last line for the status bar
 
     body_lines = body.split("\n")
@@ -91,7 +94,7 @@ def _compose(body: str, title: str, paused: bool, mode: str) -> str:
     while len(lines) < term_h - 1:
         lines.append("")
     lines = lines[: term_h - 1]
-    lines.append(_status_bar(title, paused, mode))
+    lines.append(_status_bar(title, paused, mode, note))
 
     parts = ["\x1b[H"]
     for i, line in enumerate(lines):
@@ -103,40 +106,63 @@ def _compose(body: str, title: str, paused: bool, mode: str) -> str:
 
 def play(resolved: Resolved, want_audio: bool = True) -> None:
     """Stream and play the resolved video in the terminal until it ends or 'q'."""
-    size = shutil.get_terminal_size(fallback=(80, 24))
-    term_size = (size.columns, size.lines)
-    w, h = fit_grid(
-        resolved.width, resolved.height, size.columns, size.lines,
-        reserve_bottom_lines=1,
-    )
+    img_proto = gpu.detect_image_protocol()  # "kitty" or None
+    image_mode = False                       # toggled with "g"
+    mode_idx = 0                             # index into MODES (block renderers)
+    w = h = 0                                # current decoder dimensions
+    paused = False
+    last_buf: bytes | None = None
+    notice = ""
+    notice_until = 0.0
 
-    video = StreamVideoSource(resolved.video_url, w, h, fps=resolved.fps)
+    def make_decoder(start: float) -> StreamVideoSource:
+        """Build a decoder for the current state (image vs block) at `start`."""
+        nonlocal w, h
+        sz = shutil.get_terminal_size(fallback=(80, 24))
+        if image_mode and img_proto:
+            px = gpu.terminal_pixel_size() or (sz.columns * 10, sz.lines * 20)
+            w, h = gpu.fit_pixels(resolved.width, resolved.height, px[0], px[1])
+            return StreamVideoSource(
+                resolved.video_url, w, h, fps=resolved.fps, start=start, pixels=True
+            )
+        w, h = fit_grid(
+            resolved.width, resolved.height, sz.columns, sz.lines, reserve_bottom_lines=1
+        )
+        return StreamVideoSource(resolved.video_url, w, h, fps=resolved.fps, start=start)
+
+    def render_current() -> None:
+        if last_buf is None:
+            return
+        if image_mode and img_proto:
+            sys.stdout.write(gpu.kitty_frame(last_buf, w, h))
+        else:
+            note = notice if time.time() < notice_until else ""
+            body = _render_body(last_buf, w, h, MODES[mode_idx])
+            sys.stdout.write(_compose(body, resolved.title, paused, MODES[mode_idx], note))
+        sys.stdout.flush()
+
     audio: AudioPlayer | None = None
     if want_audio and resolved.audio_url:
         audio = AudioPlayer(resolved.audio_url)
 
-    body = ""
     sys.stdout.write("\x1b[?25l\x1b[2J")  # hide cursor, clear
     sys.stdout.flush()
 
     key_reader = KeyReader()
     key_reader.start()
 
-    paused = False
-    mode_idx = 0          # index into MODES
-    last_buf: bytes | None = None
+    video = make_decoder(0.0)
+    term_size = shutil.get_terminal_size(fallback=(80, 24))
+    term_size = (term_size.columns, term_size.lines)
     last = time.time()
     play_elapsed = 0.0
     frame_idx = 0
     try:
-        # Prime the first frame so something shows while audio spins up.
-        first = video.read_frame()
+        first = video.read_frame()  # prime first frame
         if first is not None:
             last_buf = first
-            body = _render_body(first, w, h, MODES[mode_idx])
             frame_idx = 1
-        sys.stdout.write(_compose(body, resolved.title, paused, MODES[mode_idx]))
-        sys.stdout.flush()
+        render_current()
         if audio:
             audio.start(0.0)
 
@@ -144,34 +170,22 @@ def play(resolved: Resolved, want_audio: bool = True) -> None:
             now = time.time()
             dt = now - last
             last = now
-            redraw = False
+            dirty = False
 
-            # React to terminal resize: refit the grid (filling the terminal,
-            # aspect preserved) and rebuild the decoder at the current position.
-            size = shutil.get_terminal_size(fallback=(80, 24))
-            if (size.columns, size.lines) != term_size:
-                term_size = (size.columns, size.lines)
-                nw, nh = fit_grid(
-                    resolved.width, resolved.height, size.columns, size.lines,
-                    reserve_bottom_lines=1,
-                )
-                if (nw, nh) != (w, h):
-                    w, h = nw, nh
-                    video.close()
-                    video = StreamVideoSource(
-                        resolved.video_url, w, h, fps=resolved.fps, start=play_elapsed,
-                    )
-                    frame_idx = int(play_elapsed * video.fps)
-                    rb = video.read_frame()
-                    if rb is not None:
-                        frame_idx += 1
-                        body = _render_body(rb, w, h, MODES[mode_idx])
-                    else:
-                        body = ""  # next frames refresh it; old buffer size differs
-                    last_buf = rb  # always matches the current (w, h)
-                sys.stdout.write("\x1b[2J")  # clear stale cells from the old size
-                redraw = True
+            # Terminal resize -> rebuild decoder at current size + position.
+            sz = shutil.get_terminal_size(fallback=(80, 24))
+            if (sz.columns, sz.lines) != term_size:
+                term_size = (sz.columns, sz.lines)
+                video.close()
+                video = make_decoder(play_elapsed)
+                frame_idx = int(play_elapsed * video.fps)
+                last_buf = video.read_frame()
+                if last_buf is not None:
+                    frame_idx += 1
+                sys.stdout.write("\x1b[2J")
+                dirty = True
 
+            # Advance video to the wall-clock position (drop frames if behind).
             if not paused:
                 play_elapsed += dt
                 target = play_elapsed * video.fps
@@ -180,17 +194,14 @@ def play(resolved: Resolved, want_audio: bool = True) -> None:
                     buf = video.read_frame()
                     if buf is None:  # stream ended
                         if latest is not None:
-                            mode = MODES[mode_idx]
-                            body = _render_body(latest, w, h, mode)
-                            sys.stdout.write(_compose(body, resolved.title, paused, mode))
-                            sys.stdout.flush()
+                            last_buf = latest
+                            render_current()
                         return
                     latest = buf
                     frame_idx += 1
                 if latest is not None:
                     last_buf = latest
-                    body = _render_body(latest, w, h, MODES[mode_idx])
-                    redraw = True
+                    dirty = True
 
             key = key_reader.get_key()
             while key is not None:
@@ -199,22 +210,34 @@ def play(resolved: Resolved, want_audio: bool = True) -> None:
                 if key in ("SPACE", " "):
                     paused = not paused
                     if audio:
-                        if paused:
-                            audio.stop()
-                        else:
-                            audio.start(play_elapsed)
-                    redraw = True
+                        audio.stop() if paused else audio.start(play_elapsed)
+                    dirty = True
                 elif key == "v":
-                    # Cycle display mode: classic -> ascii -> b&w -> classic.
                     mode_idx = (mode_idx + 1) % len(MODES)
-                    if last_buf is not None:
-                        body = _render_body(last_buf, w, h, MODES[mode_idx])
-                    redraw = True
+                    dirty = True
+                elif key == "g":
+                    if img_proto is None:
+                        notice = "GPU image mode needs kitty / WezTerm / Ghostty"
+                        notice_until = now + 2.5
+                    else:
+                        image_mode = not image_mode
+                        video.close()
+                        video = make_decoder(play_elapsed)
+                        frame_idx = int(play_elapsed * video.fps)
+                        if img_proto == "kitty":
+                            sys.stdout.write("\x1b_Ga=d\x1b\\")  # clear images
+                        sys.stdout.write("\x1b[2J")
+                        last_buf = video.read_frame()
+                        if last_buf is not None:
+                            frame_idx += 1
+                    dirty = True
                 key = key_reader.get_key()
 
-            if redraw:
-                sys.stdout.write(_compose(body, resolved.title, paused, MODES[mode_idx]))
-                sys.stdout.flush()
+            if time.time() < notice_until:
+                dirty = True  # keep the notice visible briefly
+
+            if dirty:
+                render_current()
 
             if not paused:
                 time.sleep(max(0.0, 1.0 / video.fps - (time.time() - now)))
@@ -228,5 +251,7 @@ def play(resolved: Resolved, want_audio: bool = True) -> None:
             audio.stop()
         video.close()
         key_reader.stop()
+        if img_proto == "kitty":
+            sys.stdout.write("\x1b_Ga=d\x1b\\")  # delete any leftover images
         sys.stdout.write("\x1b[?25h\x1b[2J\x1b[H")  # show cursor, clear
         sys.stdout.flush()
