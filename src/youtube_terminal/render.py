@@ -193,6 +193,52 @@ def frame_to_ascii(buf: bytes, width: int, height: int, color: bool = True) -> s
     return "\n".join(out)
 
 
+# The classic 16 ANSI colors (approx. xterm RGB) with their SGR foreground codes.
+_PALETTE_16 = [
+    ((0, 0, 0), 30), ((205, 0, 0), 31), ((0, 205, 0), 32), ((205, 205, 0), 33),
+    ((0, 0, 238), 34), ((205, 0, 205), 35), ((0, 205, 205), 36), ((229, 229, 229), 37),
+    ((127, 127, 127), 90), ((255, 0, 0), 91), ((0, 255, 0), 92), ((255, 255, 0), 93),
+    ((92, 92, 255), 94), ((255, 0, 255), 95), ((0, 255, 255), 96), ((255, 255, 255), 97),
+]
+
+
+def frame_to_digits(buf: bytes, width: int, height: int) -> str:
+    """Render a raw rgb24 frame using only digits 0-9 and the 16 ANSI colors.
+
+    Each cell (two stacked pixels averaged) becomes a digit by brightness
+    (0 = darkest … 9 = brightest), colored with the nearest of the classic
+    16-color terminal palette. Retro low-fi look.
+    """
+    pal = _PALETTE_16
+    row_stride = width * 3
+    out: list[str] = []
+    for ty in range(height):
+        top = ty * 2 * row_stride
+        bot = (ty * 2 + 1) * row_stride
+        cells: list[str] = []
+        for tx in range(width):
+            ti = top + tx * 3
+            bi = bot + tx * 3
+            r = (buf[ti] + buf[bi]) >> 1
+            g = (buf[ti + 1] + buf[bi + 1]) >> 1
+            b = (buf[ti + 2] + buf[bi + 2]) >> 1
+            lum = (r * 299 + g * 587 + b * 114) // 1000
+            digit = lum * 9 // 255
+            best_code = 30
+            best_dist = 1 << 30
+            for (pr, pg, pb), code in pal:
+                dr = r - pr
+                dg = g - pg
+                db = b - pb
+                dist = dr * dr + dg * dg + db * db
+                if dist < best_dist:
+                    best_dist = dist
+                    best_code = code
+            cells.append(f"\x1b[{best_code}m{digit}")
+        out.append("".join(cells))
+    return "\n".join(out)
+
+
 class VideoSource:
     """Streams a video as raw rgb24 half-block frames using an ffmpeg pipe.
 

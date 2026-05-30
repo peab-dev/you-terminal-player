@@ -18,12 +18,18 @@ from .render import (
     fit_grid,
     frame_to_ansi,
     frame_to_ascii,
+    frame_to_digits,
 )
 from .resolve import Resolved
 
 # Display modes, cycled with the "v" key.
-MODES = ("classic", "ascii", "bw")
-_MODE_LABELS = {"classic": "classic", "ascii": "ascii", "bw": "b&w"}
+MODES = ("classic", "ascii", "bw", "digit16")
+_MODE_LABELS = {
+    "classic": "classic",
+    "ascii": "ascii",
+    "bw": "b&w",
+    "digit16": "16-color digits",
+}
 
 
 def _render_body(buf: bytes, w: int, h: int, mode: str) -> str:
@@ -32,6 +38,8 @@ def _render_body(buf: bytes, w: int, h: int, mode: str) -> str:
         return frame_to_ascii(buf, w, h, color=True)
     if mode == "bw":
         return frame_to_ascii(buf, w, h, color=False)
+    if mode == "digit16":
+        return frame_to_digits(buf, w, h)
     return frame_to_ansi(buf, w, h)  # classic colored half-blocks
 
 
