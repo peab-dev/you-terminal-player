@@ -86,8 +86,10 @@ def _status_bar(title: str, paused: bool, label: str, extra: str) -> str:
     )
 
 
-def _compose(body: str, title: str, paused: bool, label: str, extra: str) -> str:
-    """Full-screen ANSI frame: centered body + a one-line status bar."""
+def _frame_lines(body: str, title: str, paused: bool, label: str, extra: str) -> list[str]:
+    """Build the exact screen content as a list of term_h lines (centered body
+    plus a bottom status bar). Returned as separate lines so the player can
+    redraw only the rows that changed (frame differencing)."""
     term_h = shutil.get_terminal_size(fallback=(80, 24)).lines
     avail = max(term_h - 1, 1)  # reserve the last line for the status bar
 
@@ -101,13 +103,7 @@ def _compose(body: str, title: str, paused: bool, label: str, extra: str) -> str
         lines.append("")
     lines = lines[: term_h - 1]
     lines.append(_status_bar(title, paused, label, extra))
-
-    parts = ["\x1b[H"]
-    for i, line in enumerate(lines):
-        parts.append("\x1b[0m" + line + "\x1b[0m\x1b[K")
-        if i < len(lines) - 1:
-            parts.append("\n")
-    return "".join(parts)
+    return lines
 
 
 def play(
@@ -128,6 +124,7 @@ def play(
     w = h = 0                      # current decoder dimensions (cells)
     paused = False
     last_buf: bytes | None = None
+    prev_lines: list[str] | None = None  # last frame's screen rows (for diffing)
 
     # Resolution ("R") starts at the option closest to what we resolved.
     res_idx = min(range(len(RES_OPTIONS)), key=lambda i: abs(RES_OPTIONS[i] - resolved.height))
@@ -146,14 +143,34 @@ def play(
         )
         return StreamVideoSource(resolved.video_url, w, h, fps=current_fps, start=start)
 
-    def render_current() -> None:
+    def render_current(force: bool = False) -> None:
+        """Draw the current frame, redrawing only changed rows unless `force`."""
+        nonlocal prev_lines
         if last_buf is None:
             return
         body = _render_body(last_buf, w, h, MODES[mode_idx])
         label = _MODE_LABELS[MODES[mode_idx]]
         extra = f"{RES_OPTIONS[res_idx]}p·{current_fps:g}fps·{w}×{h}"
-        sys.stdout.write(_compose(body, resolved.title, paused, label, extra))
-        sys.stdout.flush()
+        lines = _frame_lines(body, resolved.title, paused, label, extra)
+
+        if force or prev_lines is None or len(prev_lines) != len(lines):
+            out = ["\x1b[2J\x1b[H"]
+            for i, line in enumerate(lines):
+                out.append("\x1b[0m" + line + "\x1b[0m\x1b[K")
+                if i < len(lines) - 1:
+                    out.append("\n")
+            sys.stdout.write("".join(out))
+            sys.stdout.flush()
+        else:
+            out = [
+                f"\x1b[{i + 1};1H\x1b[0m{line}\x1b[0m\x1b[K"
+                for i, (line, old) in enumerate(zip(lines, prev_lines, strict=False))
+                if line != old
+            ]
+            if out:
+                sys.stdout.write("".join(out))
+                sys.stdout.flush()
+        prev_lines = lines
 
     audio: AudioPlayer | None = None
     if want_audio and resolved.audio_url:
@@ -176,7 +193,7 @@ def play(
         if first is not None:
             last_buf = first
             frame_idx = 1
-        render_current()
+        render_current(force=True)
         if audio:
             audio.start(0.0)
 
@@ -185,6 +202,7 @@ def play(
             dt = now - last
             last = now
             dirty = False
+            force = False  # full redraw needed (grid changed)?
 
             # Terminal resize -> rebuild decoder at current size + position.
             sz = shutil.get_terminal_size(fallback=(80, 24))
@@ -196,8 +214,8 @@ def play(
                 last_buf = video.read_frame()
                 if last_buf is not None:
                     frame_idx += 1
-                sys.stdout.write("\x1b[2J")
                 dirty = True
+                force = True
 
             # Advance video to the wall-clock position (drop frames if behind).
             if not paused:
@@ -257,7 +275,6 @@ def play(
                         last_buf = video.read_frame()
                         if last_buf is not None:
                             frame_idx += 1
-                        sys.stdout.write("\x1b[2J")
                         last = time.time()  # don't count the re-resolve as elapsed
                     dirty = True
                 elif key == "f":
@@ -275,7 +292,7 @@ def play(
                 key = key_reader.get_key()
 
             if dirty:
-                render_current()
+                render_current(force=force)
 
             if not paused:
                 time.sleep(max(0.0, 1.0 / video.fps - (time.time() - now)))

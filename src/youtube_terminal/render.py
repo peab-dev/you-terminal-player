@@ -146,13 +146,18 @@ def frame_to_ansi(buf: bytes, width: int, height: int) -> str:
         top = ty * 2 * row_stride
         bot = (ty * 2 + 1) * row_stride
         cells: list[str] = []
+        prev = ""
         for tx in range(width):
             ti = top + tx * 3
             bi = bot + tx * 3
-            cells.append(
-                f"\x1b[38;2;{buf[ti]};{buf[ti + 1]};{buf[ti + 2]};"
-                f"48;2;{buf[bi]};{buf[bi + 1]};{buf[bi + 2]}m▀"
+            code = (
+                f"38;2;{buf[ti]};{buf[ti + 1]};{buf[ti + 2]};"
+                f"48;2;{buf[bi]};{buf[bi + 1]};{buf[bi + 2]}"
             )
+            if code != prev:  # only emit color when it changes (coalescing)
+                cells.append(f"\x1b[{code}m")
+                prev = code
+            cells.append("▀")
         out.append("".join(cells))
     return "\n".join(out)
 
@@ -177,6 +182,7 @@ def frame_to_ascii(buf: bytes, width: int, height: int, color: bool = True) -> s
         top = ty * 2 * row_stride
         bot = (ty * 2 + 1) * row_stride
         cells: list[str] = []
+        prev = ""
         for tx in range(width):
             ti = top + tx * 3
             bi = bot + tx * 3
@@ -185,10 +191,11 @@ def frame_to_ascii(buf: bytes, width: int, height: int, color: bool = True) -> s
             b = (buf[ti + 2] + buf[bi + 2]) >> 1
             lum = (r * 299 + g * 587 + b * 114) // 1000
             ch = ramp[lum * last // 255]
-            if color:
-                cells.append(f"\x1b[38;2;{r};{g};{b}m{ch}")
-            else:
-                cells.append(f"\x1b[38;2;{lum};{lum};{lum}m{ch}")
+            code = f"38;2;{r};{g};{b}" if color else f"38;2;{lum};{lum};{lum}"
+            if code != prev:
+                cells.append(f"\x1b[{code}m")
+                prev = code
+            cells.append(ch)
         out.append("".join(cells))
     return "\n".join(out)
 
@@ -213,12 +220,17 @@ def frame_to_matrix(buf: bytes, width: int, height: int) -> str:
         top = ty * 2 * row_stride
         bot = (ty * 2 + 1) * row_stride
         cells: list[str] = []
+        prev = ""
         for tx in range(width):
             ti = top + tx * 3
             bi = bot + tx * 3
             fr, fg, fb = tone(buf[ti], buf[ti + 1], buf[ti + 2])
             br, bg, bb = tone(buf[bi], buf[bi + 1], buf[bi + 2])
-            cells.append(f"\x1b[38;2;{fr};{fg};{fb};48;2;{br};{bg};{bb}m▀")
+            code = f"38;2;{fr};{fg};{fb};48;2;{br};{bg};{bb}"
+            if code != prev:
+                cells.append(f"\x1b[{code}m")
+                prev = code
+            cells.append("▀")
         out.append("".join(cells))
     return "\n".join(out)
 
@@ -235,13 +247,18 @@ def frame_to_fullblocks(buf: bytes, width: int, height: int) -> str:
         top = ty * 2 * row_stride
         bot = (ty * 2 + 1) * row_stride
         cells: list[str] = []
+        prev = ""
         for tx in range(width):
             ti = top + tx * 3
             bi = bot + tx * 3
             r = (buf[ti] + buf[bi]) >> 1
             g = (buf[ti + 1] + buf[bi + 1]) >> 1
             b = (buf[ti + 2] + buf[bi + 2]) >> 1
-            cells.append(f"\x1b[38;2;{r};{g};{b}m█")
+            code = f"38;2;{r};{g};{b}"
+            if code != prev:
+                cells.append(f"\x1b[{code}m")
+                prev = code
+            cells.append("█")
         out.append("".join(cells))
     return "\n".join(out)
 
@@ -269,6 +286,7 @@ def frame_to_digits(buf: bytes, width: int, height: int) -> str:
         top = ty * 2 * row_stride
         bot = (ty * 2 + 1) * row_stride
         cells: list[str] = []
+        prev = -1
         for tx in range(width):
             ti = top + tx * 3
             bi = bot + tx * 3
@@ -287,7 +305,10 @@ def frame_to_digits(buf: bytes, width: int, height: int) -> str:
                 if dist < best_dist:
                     best_dist = dist
                     best_code = code
-            cells.append(f"\x1b[{best_code}m{digit}")
+            if best_code != prev:
+                cells.append(f"\x1b[{best_code}m")
+                prev = best_code
+            cells.append(str(digit))
         out.append("".join(cells))
     return "\n".join(out)
 
@@ -308,6 +329,7 @@ def frame_to_hippie(buf: bytes, width: int, height: int) -> str:
         top = ty * 2 * row_stride
         bot = (ty * 2 + 1) * row_stride
         cells: list[str] = []
+        prev = ""
         for tx in range(width):
             ti = top + tx * 3
             bi = bot + tx * 3
@@ -317,22 +339,43 @@ def frame_to_hippie(buf: bytes, width: int, height: int) -> str:
             lum = (r * 299 + g * 587 + b * 114) // 1000
             ch = ramp[lum * last // 255]
             pr, pg, pb = min(pal, key=lambda c: (r - c[0]) ** 2 + (g - c[1]) ** 2 + (b - c[2]) ** 2)
-            cells.append(f"\x1b[38;2;{pr};{pg};{pb}m{ch}")
+            code = f"38;2;{pr};{pg};{pb}"
+            if code != prev:
+                cells.append(f"\x1b[{code}m")
+                prev = code
+            cells.append(ch)
         out.append("".join(cells))
     return "\n".join(out)
 
 
-# "emojis": colored square emojis chosen by nearest color. Each is double-width,
-# so one emoji covers a 2x2 source block (and two terminal columns).
+# "emojis": fun emojis chosen to match each pixel's color as closely as possible.
+# The RGB values are the measured average color of each emoji (Apple Color Emoji),
+# so nearest-color matching is accurate. All are double-width, so one emoji covers
+# a 2x2 source block (two terminal columns). Order: (r, g, b), emoji.
 _EMOJI_PALETTE = [
-    ((0, 0, 0), "⬛"), ((255, 255, 255), "⬜"), ((255, 0, 0), "🟥"),
-    ((255, 140, 0), "🟧"), ((255, 255, 0), "🟨"), ((0, 190, 0), "🟩"),
-    ((0, 90, 255), "🟦"), ((150, 40, 220), "🟪"), ((140, 80, 40), "🟫"),
+    ((196, 64, 56), "🍎"), ((180, 69, 55), "🍓"), ((176, 34, 30), "🌹"),
+    ((193, 74, 33), "🍅"), ((187, 118, 100), "🌷"), ((243, 158, 195), "🌸"),
+    ((226, 61, 161), "🩷"), ((246, 139, 58), "🔥"), ((207, 127, 48), "🍊"),
+    ((195, 110, 28), "🦊"), ((160, 113, 34), "🥕"), ((215, 118, 71), "🍑"),
+    ((240, 211, 114), "🌟"), ((241, 212, 123), "⭐"), ((236, 208, 99), "🌝"),
+    ((167, 134, 2), "🌻"), ((238, 176, 31), "🧀"), ((192, 172, 59), "🍋"),
+    ((145, 141, 29), "🌽"), ((226, 178, 50), "🐥"), ((120, 161, 78), "🐸"),
+    ((162, 166, 80), "🥝"), ((54, 107, 57), "🌲"), ((125, 173, 60), "🍏"),
+    ((107, 196, 48), "🍀"), ((80, 121, 50), "🥦"), ((86, 145, 44), "🌵"),
+    ((127, 166, 189), "🌊"), ((80, 113, 168), "🫐"), ((109, 188, 241), "💎"),
+    ((111, 159, 185), "🧊"), ((65, 157, 184), "🐳"), ((0, 88, 213), "🌀"),
+    ((164, 99, 151), "🔮"), ((151, 49, 88), "🍇"), ((169, 55, 241), "🟣"),
+    ((78, 78, 127), "🪻"), ((125, 87, 51), "🐻"), ((179, 129, 71), "🍪"),
+    ((132, 62, 34), "🌰"), ((137, 55, 29), "🧱"), ((132, 101, 77), "🪵"),
+    ((240, 208, 45), "🌕"), ((189, 185, 167), "🦢"), ((197, 195, 192), "🍚"),
+    ((41, 55, 78), "🌑"), ((28, 28, 27), "⚫"), ((86, 86, 86), "🎱"),
+    ((94, 94, 88), "🪨"), ((120, 122, 118), "🐘"), ((144, 144, 144), "🩶"),
 ]
 
 
 def frame_to_emoji(buf: bytes, width: int, height: int) -> str:
-    """Render a raw rgb24 frame as a mosaic of colored square emojis."""
+    """Render a raw rgb24 frame as a mosaic of fun emojis, each picked to match
+    the underlying color as closely as possible (redmean color distance)."""
     pal = _EMOJI_PALETTE
     row_stride = width * 3
     out: list[str] = []
@@ -352,10 +395,19 @@ def frame_to_emoji(buf: bytes, width: int, height: int) -> str:
             r >>= 2
             g >>= 2
             b >>= 2
-            nearest = min(
-                pal, key=lambda c: (r - c[0][0]) ** 2 + (g - c[0][1]) ** 2 + (b - c[0][2]) ** 2
-            )
-            cells.append(nearest[1])
+            best = pal[0][1]
+            best_dist = 1 << 62
+            for (pr, pg, pb), emoji in pal:
+                rmean = (r + pr) >> 1  # redmean: perceptual, integer-fast
+                dr = r - pr
+                dg = g - pg
+                db = b - pb
+                dist = (((512 + rmean) * dr * dr) >> 8) + 4 * dg * dg + \
+                       (((767 - rmean) * db * db) >> 8)
+                if dist < best_dist:
+                    best_dist = dist
+                    best = emoji
+            cells.append(best)
         out.append("".join(cells))
     return "\n".join(out)
 

@@ -100,7 +100,7 @@ yt "https://youtu.be/..."                     # short links work too
 | Key | Action |
 |-----|--------|
 | `space` | pause / resume (video **and** audio) |
-| `v` | cycle display mode: **classic** (colored half-blocks) → **ASCII** (oldschool colored ASCII art) → **b&w** (black & white ASCII) → **16-color digits** (digits 0–9 in the classic 16 ANSI colors) → **full-blocks** (solid colored `█` blocks) → **matrix** (black/gray + 3 green tones) → **hippieparty** (ASCII in red/blue/white/gray) → **emojis** (colored-square emoji mosaic) → classic |
+| `v` | cycle display mode: **classic** (colored half-blocks) → **ASCII** (oldschool colored ASCII art) → **b&w** (black & white ASCII) → **16-color digits** (digits 0–9 in the classic 16 ANSI colors) → **full-blocks** (solid colored `█` blocks) → **matrix** (black/gray + 3 green tones) → **hippieparty** (ASCII in red/blue/white/gray) → **emojis** (mosaic of fun emojis, each color-matched to the pixel) → classic |
 | `r` | cycle source resolution: 240 → 360 → 480 → 720 → 1080 (re-fetches the stream at that quality) |
 | `f` | cycle frame rate: 15 → 24 → 30 → 60, plus the video's original fps |
 | `q` / `ESC` | quit |
