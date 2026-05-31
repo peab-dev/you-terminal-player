@@ -3,11 +3,11 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-ff0033?style=flat-square"></a>
-  <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10+-39ff14?style=flat-square&logo=python&logoColor=white">
-  <img alt="Platform: macOS" src="https://img.shields.io/badge/platform-macOS-00e5ff?style=flat-square&logo=apple&logoColor=white">
-  <img alt="Powered by yt-dlp" src="https://img.shields.io/badge/powered%20by-yt--dlp-ff0033?style=flat-square">
-  <a href="https://peab-dev.github.io/you-terminal-player/"><img alt="Docs" src="https://img.shields.io/badge/docs-GitHub%20Pages-39ff14?style=flat-square"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-d64545?style=flat-square"></a>
+  <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white">
+  <img alt="Platform: macOS" src="https://img.shields.io/badge/platform-macOS-555?style=flat-square&logo=apple&logoColor=white">
+  <img alt="Powered by yt-dlp" src="https://img.shields.io/badge/powered%20by-yt--dlp-d64545?style=flat-square">
+  <a href="https://peab-dev.github.io/you-terminal-player/"><img alt="Docs" src="https://img.shields.io/badge/docs-GitHub%20Pages-4c8bf5?style=flat-square"></a>
 </p>
 
 <p align="center">
