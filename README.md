@@ -14,6 +14,10 @@
   <strong>Watch YouTube in your terminal in the highest possible resolution, with live, synchronized sound.</strong> 📺🔊
 </p>
 
+<p align="center">
+  Developed with ❤️ in 🇦🇹 by <a href="https://peab.at"><img alt="PEAB Website peab.at" src="https://img.shields.io/badge/peab.at-d4f500?style=flat-square"></a>
+</p>
+
 <p align="center">📖 <a href="https://peab-dev.github.io/you-terminal-player/"><strong>Full documentation</strong></a></p>
 
 ## Quick start
@@ -50,6 +54,4 @@ Uninstall with `./uninstall.sh`. See the
 [docs](https://peab-dev.github.io/you-terminal-player/) for options, internals
 and troubleshooting.
 
-## License
-
-MIT
+<p>Developed with ❤️ in 🇦🇹 by <a href="https://peab.at"><img alt="PEAB Website peab.at" src="https://img.shields.io/badge/peab.at-d4f500?style=flat-square"></a></p>
