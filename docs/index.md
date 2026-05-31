@@ -2,12 +2,12 @@
   <img src="assets/banner.svg" alt="you-terminal-player" width="100%">
 </p>
 
-Watch **YouTube videos right inside your terminal** — rendered as colored
-half-blocks at the terminal's full resolution and the video's original frame
-rate, **with live, synchronized sound**.
+**Watch YouTube in your terminal in the highest possible resolution, with live,
+synchronized sound.** 📺🔊
 
-It's fully self-contained: a small half-block renderer plus `yt-dlp`, `ffmpeg`
-and `ffplay` do all the work.
+Frames are rendered as colored half-blocks at the terminal's full resolution and
+the video's original frame rate. It's fully self-contained: a small half-block
+renderer plus `yt-dlp`, `ffmpeg` and `ffplay` do all the work.
 
 ---
 
