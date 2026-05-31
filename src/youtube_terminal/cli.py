@@ -11,7 +11,7 @@ from .player import play
 from .resolve import ResolveError, resolve
 
 _RES_CHOICES = {"360": 360, "480": 480, "720": 720, "1080": 1080, "best": None}
-_DEFAULT_URL = "https://www.youtube.com/watch?v=V014WV2l-Uk"
+_DEFAULT_URL = "https://www.youtube.com/watch?v=ocVluDkZpq4"
 
 
 def main() -> None:
